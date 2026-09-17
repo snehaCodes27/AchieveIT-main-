@@ -10,6 +10,7 @@ from app.schemas.achievement import AchievementCreate, AchievementResponse
 from app.api.deps import get_current_user
 from app.services.duplicate_service import check_duplicate
 from app.services.name_validation_service import validate_participant_name
+from app.services.storage_service import generate_signed_certificate_url
 
 router = APIRouter()
 
@@ -98,7 +99,7 @@ def create_achievement(
     db.refresh(achievement)
 
     # Attach certificate_url & file_name for response
-    setattr(achievement, "certificate_url", f"http://127.0.0.1:8000{certificate.file_url}" if certificate.file_url else None)
+    setattr(achievement, "certificate_url", generate_signed_certificate_url(certificate.file_url) if certificate.file_url else None)
     setattr(achievement, "file_name", certificate.file_name)
 
     return achievement
@@ -106,15 +107,7 @@ def create_achievement(
 def format_cert_url(raw_url: Optional[str]) -> Optional[str]:
     if not raw_url or not raw_url.strip():
         return None
-    url = raw_url.strip()
-    if url.startswith("http://") or url.startswith("https://"):
-        if "http://" in url[7:] or "https://" in url[8:]:
-            last_http = max(url.rfind("http://"), url.rfind("https://"))
-            url = url[last_http:]
-        return url
-    if not url.startswith("/"):
-        url = "/" + url
-    return f"http://localhost:8000{url}"
+    return generate_signed_certificate_url(raw_url)
 
 @router.get("/my")
 def get_my_achievements(
@@ -187,3 +180,41 @@ def get_all_achievements(
             "created_at": ach.created_at
         })
     return result
+
+@router.get("/{achievement_id}/certificate-url")
+def get_achievement_certificate_url(
+    achievement_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Securely retrieve a signed certificate URL with strict authorization:
+    - Students and Faculty can only access their own certificates
+    - HOD/Admin can access any certificate in the department
+    """
+    achievement = db.query(Achievement).filter(Achievement.id == achievement_id).first()
+    if not achievement:
+        raise HTTPException(status_code=404, detail="Achievement record not found.")
+
+    is_owner = achievement.user_id == current_user.id
+    is_admin = current_user.role == UserRole.ADMIN
+
+    if not (is_owner or is_admin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: You are not authorized to view this certificate."
+        )
+
+    if not achievement.certificate or not achievement.certificate.file_url:
+        raise HTTPException(status_code=404, detail="No certificate proof attached to this achievement.")
+
+    signed_url = generate_signed_certificate_url(achievement.certificate.file_url)
+    if not signed_url:
+        raise HTTPException(status_code=500, detail="Failed to generate secure access URL for certificate.")
+
+    return {
+        "achievement_id": achievement.id,
+        "certificate_url": signed_url,
+        "file_name": achievement.certificate.file_name,
+        "expires_in": 3600
+    }

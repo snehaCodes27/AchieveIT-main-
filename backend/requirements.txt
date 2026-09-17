@@ -13,8 +13,13 @@ psycopg2-binary>=2.9.9
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
 
+# Cloud Storage
+supabase>=2.31.0
+
 # AI & OCR
 pytesseract>=0.3.10
+rapidocr_onnxruntime>=1.2.3
+pypdf>=4.0.0
 Pillow>=10.4.0
 google-genai>=1.0.0
 

@@ -1,6 +1,7 @@
 import os
 import shutil
 import uuid
+import logging
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.orm import Session
 from app.db.session import get_db
@@ -9,6 +10,9 @@ from app.models.user import User
 from app.services.ocr_service import extract_text, extract_structured_fields
 from app.services.duplicate_service import compute_file_hash, check_duplicate
 from app.services.name_validation_service import validate_participant_name
+from app.services.storage_service import upload_certificate_to_supabase, generate_signed_certificate_url
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -49,10 +53,17 @@ async def scan_certificate(
         file_hash=file_hash
     )
 
-    # 3. If exact duplicate, return immediately without calling AI
+    # 3. If exact duplicate, remove temp file and return immediately without calling AI
     if is_dup:
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception:
+            pass
+
         return {
-            "file_url": f"/uploads/{unique_filename}",
+            "file_url": dup_info.get("file_url") or f"/uploads/{unique_filename}",
+            "preview_url": dup_info.get("file_url") or "",
             "file_name": file.filename,
             "file_hash": file_hash,
             "extracted_text": "",
@@ -97,8 +108,34 @@ async def scan_certificate(
     if not extracted_data.get("participant_name"):
         extracted_data["participant_name"] = current_user.name
 
+    # 6. Upload certificate to Supabase Storage (Private bucket: 'certificates')
+    storage_ref = None
+    signed_preview_url = None
+    try:
+        storage_ref = upload_certificate_to_supabase(
+            user_id=current_user.id,
+            file_source=file_path,
+            filename=unique_filename,
+            content_type=file.content_type
+        )
+        signed_preview_url = generate_signed_certificate_url(storage_ref)
+    except Exception as e:
+        logger.error(f"Failed to upload certificate to Supabase Storage: {str(e)}")
+        # Fallback to local storage reference if Supabase is offline or fails
+        storage_ref = f"/uploads/{unique_filename}"
+        signed_preview_url = f"http://localhost:8000{storage_ref}"
+
+    # 7. Clean up temporary local file if successfully stored in Supabase
+    if storage_ref and storage_ref.startswith("certificates/"):
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception as e:
+            logger.warning(f"Failed to clean up temporary file {file_path}: {str(e)}")
+
     return {
-        "file_url": f"/uploads/{unique_filename}",
+        "file_url": storage_ref,
+        "preview_url": signed_preview_url or storage_ref,
         "file_name": file.filename,
         "file_hash": file_hash,
         "extracted_text": raw_text or str(extracted_data),
