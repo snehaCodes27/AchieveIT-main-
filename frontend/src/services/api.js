@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'https://achieveit-backend-4ffa.onrender.com';
 
 // Helper for HTTP requests with clean error message formatting
 async function request(endpoint, options = {}) {

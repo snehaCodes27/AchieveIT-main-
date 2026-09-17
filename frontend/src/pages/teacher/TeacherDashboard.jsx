@@ -1500,8 +1500,8 @@ export default function TeacherDashboard() {
                   <a
                     href={
                       previewCertUrl.startsWith("http")
-                        ? previewCertUrl.replace("http://127.0.0.1:8000", "http://localhost:8000")
-                        : `http://localhost:8000${previewCertUrl.startsWith("/") ? "" : "/"}${previewCertUrl}`
+                        ? previewCertUrl.replace("http://127.0.0.1:8000", "https://achieveit-backend-4ffa.onrender.com").replace("http://localhost:8000", "https://achieveit-backend-4ffa.onrender.com")
+                        : `https://achieveit-backend-4ffa.onrender.com${previewCertUrl.startsWith("/") ? "" : "/"}${previewCertUrl}`
                     }
                     target="_blank"
                     rel="noreferrer"
@@ -1519,8 +1519,8 @@ export default function TeacherDashboard() {
             <div className="cert-preview-body">
               {(() => {
                 const cleanUrl = previewCertUrl.startsWith("http")
-                  ? previewCertUrl.replace("http://127.0.0.1:8000", "http://localhost:8000")
-                  : `http://localhost:8000${previewCertUrl.startsWith("/") ? "" : "/"}${previewCertUrl}`;
+                  ? previewCertUrl.replace("http://127.0.0.1:8000", "https://achieveit-backend-4ffa.onrender.com").replace("http://localhost:8000", "https://achieveit-backend-4ffa.onrender.com")
+                  : `https://achieveit-backend-4ffa.onrender.com${previewCertUrl.startsWith("/") ? "" : "/"}${previewCertUrl}`;
 
                 if (cleanUrl.toLowerCase().includes(".pdf")) {
                   return (
