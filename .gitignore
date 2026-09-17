@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+backend/venv/
+venv/
+env/
+.venv/
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# Build outputs
+dist/
+build/
+frontend/dist/
+*.egg-info/
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+backend/**/__pycache__/
+.pytest_cache/
+
+# Uploaded certificate proofs (keep folder structure, ignore uploaded files)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# System & IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log

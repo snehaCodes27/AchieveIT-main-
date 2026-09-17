@@ -1,0 +1,29 @@
+# Web Framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.8.0
+pydantic-settings>=2.4.0
+python-multipart>=0.0.9
+
+# Database & ORM
+sqlalchemy>=2.0.30
+psycopg2-binary>=2.9.9
+
+# Authentication (JWT)
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# AI & OCR
+pytesseract>=0.3.10
+Pillow>=10.4.0
+google-genai>=1.0.0
+
+# RAG & Vector Database
+langchain>=0.3.0
+langchain-community>=0.3.0
+chromadb>=0.5.0
+
+# Analytics & Reports
+pandas>=2.2.0
+openpyxl>=3.1.5
+reportlab>=4.2.0
