@@ -77,7 +77,7 @@ export default function StudentDashboard() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [activeProfileTab, setActiveProfileTab] = useState("avatar");
   const [profileImage, setProfileImage] = useState(
-    localStorage.getItem(`student_avatar_${user?.collegeId || "default"}`) || ""
+ 	localStorage.getItem(`student_avatar_${user?.college_id || user?.collegeId || "default"}`) || ""	
   );
   const [previewAvatar, setPreviewAvatar] = useState("");
   const [profileSuccess, setProfileSuccess] = useState("");
@@ -100,6 +100,8 @@ export default function StudentDashboard() {
   const [formSuccess, setFormSuccess] = useState("");
   const [nameValidation, setNameValidation] = useState(null);
   const [isNameMismatch, setIsNameMismatch] = useState(false);
+  const [showCourseRejectModal, setShowCourseRejectModal] = useState(false);
+  const [isCourseRejected, setIsCourseRejected] = useState(false);
 
   // File Size & Intelligent Compression States
   const [selectedRawFile, setSelectedRawFile] = useState(null);
@@ -227,7 +229,7 @@ export default function StudentDashboard() {
     }
 
     try {
-      localStorage.setItem(`student_avatar_${user?.collegeId || "default"}`, previewAvatar);
+      localStorage.setItem(`student_avatar_${user?.college_id || user?.collegeId || "default"}`, previewAvatar);
       setProfileImage(previewAvatar);
       setProfileSuccess("Profile picture updated successfully!");
       setTimeout(() => {
@@ -282,6 +284,7 @@ export default function StudentDashboard() {
     setScanMessage("");
     setNameValidation(null);
     setIsNameMismatch(false);
+    setIsCourseRejected(false);
 
     // Rule: If file <= 20 KB -> Proceed directly with normal OCR scanning
     if (sizeKb <= MAX_FILE_SIZE_KB) {
@@ -359,6 +362,7 @@ export default function StudentDashboard() {
     setFormError("");
     setNameValidation(null);
     setIsNameMismatch(false);
+    setIsCourseRejected(false);
 
     try {
       const scanResult = await scanCertificateApi(fileToScan);
@@ -387,6 +391,43 @@ export default function StudentDashboard() {
         else if (catStr.includes("sport") || catStr.includes("cultur") || catStr.includes("dance") || catStr.includes("music") || catStr.includes("drama") || catStr.includes("vocal") || catStr.includes("sing") || catStr.includes("art")) detectedCat = "sports_cultural";
         else if (catStr.includes("social") || catStr.includes("lead") || catStr.includes("nss") || catStr.includes("volunteer") || catStr.includes("club")) detectedCat = "social_service";
         else if (catStr.includes("hack") || catStr.includes("code")) detectedCat = "hackathon";
+
+        // Check if certificate is a course/class certificate and verify if NPTEL
+        const fullOcrText = [
+          d.title || "",
+          d.organization || "",
+          d.organizer || "",
+          d.issuer || "",
+          d.category || "",
+          scanResult.extracted_text || ""
+        ].join(" ").toLowerCase();
+
+        const isNptel = 
+          fullOcrText.includes("nptel") || 
+          fullOcrText.includes("swayam") || 
+          fullOcrText.includes("national programme on technology enhanced learning");
+
+        const isCourseOrClass = 
+          detectedCat === "certification" ||
+          fullOcrText.includes("course") ||
+          fullOcrText.includes("class") ||
+          fullOcrText.includes("coaching") ||
+          fullOcrText.includes("academy") ||
+          fullOcrText.includes("institute") ||
+          fullOcrText.includes("tuition") ||
+          fullOcrText.includes("tutorial") ||
+          fullOcrText.includes("udemy") ||
+          fullOcrText.includes("coursera") ||
+          fullOcrText.includes("training") ||
+          fullOcrText.includes("completion");
+
+        if (isCourseOrClass && !isNptel) {
+          setIsCourseRejected(true);
+          setShowCourseRejectModal(true);
+          setFormError("🚫 Course/Class certificates are not accepted. Only official NPTEL/SWAYAM certificates are allowed.");
+        } else {
+          setIsCourseRejected(false);
+        }
 
         setFormData((prev) => ({
           ...prev,
@@ -425,6 +466,42 @@ export default function StudentDashboard() {
       setFormError("Cannot submit: Certificate name does not match your account name.");
       return;
     }
+
+    // Block Course / Class certificates if not NPTEL
+    const fullFormText = [
+      formData.title || "",
+      formData.issuer || "",
+      formData.extractedText || "",
+      formData.description || ""
+    ].join(" ").toLowerCase();
+
+    const isNptel = 
+      fullFormText.includes("nptel") || 
+      fullFormText.includes("swayam") || 
+      fullFormText.includes("national programme on technology enhanced learning");
+
+    const isCourseOrClass =
+      formData.category === "certification" ||
+      fullFormText.includes("course") ||
+      fullFormText.includes("class") ||
+      fullFormText.includes("coaching") ||
+      fullFormText.includes("academy") ||
+      fullFormText.includes("institute") ||
+      fullFormText.includes("tuition") ||
+      fullFormText.includes("tutorial") ||
+      fullFormText.includes("udemy") ||
+      fullFormText.includes("coursera") ||
+      fullFormText.includes("training") ||
+      fullFormText.includes("completion") ||
+      isCourseRejected;
+
+    if (isCourseOrClass && !isNptel) {
+      setIsCourseRejected(true);
+      setShowCourseRejectModal(true);
+      setFormError("Cannot submit: We do not accept course/class certificates. Only official NPTEL/SWAYAM certificates are accepted.");
+      return;
+    }
+
     if (!formData.title.trim()) {
       setFormError("Achievement title is required.");
       return;
@@ -452,9 +529,9 @@ export default function StudentDashboard() {
         file_name: formData.fileName || "certificate.pdf",
         file_hash: formData.fileHash || "",
         extracted_text: formData.extractedText || "",
-        academic_year: user?.academicYear || "2024-2025",
-        year_level: user?.current_year_level || user?.yearLevel || (studentId.startsWith("2024DS") || studentId.startsWith("2022") ? "BE" : "TE"),
-        admission_batch: user?.admission_batch || user?.admissionBatch || (studentId.startsWith("2024DS") || studentId.startsWith("2022") ? "2022-2026" : "2023-2027")
+        academic_year: user?.academicYear || "2026-2027",
+        year_level: user?.current_year_level || user?.yearLevel || (studentId.startsWith("2024DS") || studentId.startsWith("2023") || user?.admission_batch === "2023-2027" ? "BE" : (studentId.startsWith("2024") ? "TE" : (studentId.startsWith("2025") ? "SE" : "FE"))),
+        admission_batch: user?.admission_batch || user?.admissionBatch || (studentId.startsWith("2024DS") || studentId.startsWith("2023") ? "2023-2027" : (studentId.startsWith("2024") ? "2024-2028" : (studentId.startsWith("2025") ? "2025-2029" : "2026-2030")))
       };
 
       await submitAchievementApi(payload);
@@ -466,6 +543,7 @@ export default function StudentDashboard() {
         setFormSuccess("");
         setNameValidation(null);
         setIsNameMismatch(false);
+        setIsCourseRejected(false);
         setSelectedRawFile(null);
         setFileSizeKB(0);
         setIsOverLimit(false);
@@ -496,9 +574,9 @@ export default function StudentDashboard() {
     }
   };
 
-  const studentName = user?.fullName || user?.name || "Matkar Sneha Shamkant";
-  const studentId = user?.collegeId || user?.studentId || "2024DSIT012";
-  const firstName = studentName.split(" ")[0] || "Sneha";
+const studentName = user?.name || user?.fullName || "";
+const studentId = user?.college_id || user?.collegeId || user?.studentId || "";
+const firstName = studentName.split(" ")[0] || "Student";
   const initials = studentName
     .split(" ")
     .map((n) => n[0])
@@ -1173,6 +1251,45 @@ export default function StudentDashboard() {
               </div>
             )}
 
+            {/* Course / Class Certificate Rejection Feedback */}
+            {isCourseRejected && (
+              <div
+                style={{
+                  background: "#fff1f2",
+                  border: "1.5px solid #f43f5e",
+                  borderRadius: "10px",
+                  padding: "14px 16px",
+                  marginBottom: "16px",
+                  boxShadow: "0 2px 6px rgba(244, 63, 94, 0.08)",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#be123c", fontWeight: "700", fontSize: "14px" }}>
+                  <span style={{ fontSize: "18px" }}>🚫</span>
+                  <span>Course / Class Certificate Not Accepted</span>
+                </div>
+                <p style={{ margin: "6px 0 10px 0", fontSize: "13px", color: "#9f1239", lineHeight: "1.4" }}>
+                  We do not accept private class or general course completion certificates (e.g. Udemy, Coursera, private institutes).
+                  As per department policy, <strong>ONLY official NPTEL / SWAYAM certifications</strong> are accepted.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowCourseRejectModal(true)}
+                  style={{
+                    background: "#be123c",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "6px",
+                    padding: "6px 12px",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                  }}
+                >
+                  View Department Policy Notice ℹ️
+                </button>
+              </div>
+            )}
+
             <form onSubmit={handleFormSubmit} className="std-modal-form">
               {/* Certificate File (Required) Dropzone */}
               <div className="std-upload-dropzone">
@@ -1351,9 +1468,29 @@ export default function StudentDashboard() {
                   <select
                     required
                     value={formData.category}
-                    onChange={(e) =>
-                      setFormData({ ...formData, category: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const newCat = e.target.value;
+                      setFormData({ ...formData, category: newCat });
+                      if (newCat === "certification") {
+                        const fullText = [
+                          formData.title || "",
+                          formData.issuer || "",
+                          formData.extractedText || ""
+                        ].join(" ").toLowerCase();
+                        const isNptel =
+                          fullText.includes("nptel") ||
+                          fullText.includes("swayam") ||
+                          fullText.includes("national programme on technology enhanced learning");
+                        if (!isNptel && (formData.file || formData.fileUrl || formData.title)) {
+                          setIsCourseRejected(true);
+                          setShowCourseRejectModal(true);
+                          setFormError("🚫 Course/Class certificates are not accepted. Only official NPTEL certificates are accepted.");
+                        }
+                      } else {
+                        setIsCourseRejected(false);
+                        if (formError.includes("NPTEL")) setFormError("");
+                      }
+                    }}
                   >
                     {CATEGORIES.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -1443,9 +1580,16 @@ export default function StudentDashboard() {
                 <button
                   type="submit"
                   className="std-btn-primary"
-                  disabled={isSubmitting || isScanning || isNameMismatch}
+                  disabled={isSubmitting || isScanning || isNameMismatch || isCourseRejected}
+                  style={isCourseRejected ? { background: "#94a3b8", cursor: "not-allowed" } : {}}
                 >
-                  {isSubmitting ? "Submitting..." : isNameMismatch ? "Name Mismatch Blocked" : "Confirm & Save Achievement →"}
+                  {isSubmitting
+                    ? "Submitting..."
+                    : isNameMismatch
+                    ? "Name Mismatch Blocked"
+                    : isCourseRejected
+                    ? "🚫 Blocked (Only NPTEL Accepted)"
+                    : "Confirm & Save Achievement →"}
                 </button>
               </div>
             </form>
@@ -1638,6 +1782,91 @@ export default function StudentDashboard() {
                 );
               })()}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================
+          MODAL 5: COURSE / CLASS CERTIFICATE POLICY POPUP
+          =================================================== */}
+      {showCourseRejectModal && (
+        <div
+          className="std-modal-overlay"
+          style={{ zIndex: 1300, background: "rgba(15, 23, 42, 0.75)" }}
+          onClick={() => setShowCourseRejectModal(false)}
+        >
+          <div
+            className="std-modal-content"
+            style={{
+              maxWidth: "500px",
+              textAlign: "center",
+              padding: "32px 28px",
+              borderTop: "6px solid #e11d48",
+              borderRadius: "18px",
+              boxShadow: "0 25px 50px -12px rgba(225, 29, 72, 0.25)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                width: "68px",
+                height: "68px",
+                background: "#ffe4e6",
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 16px auto",
+                fontSize: "32px",
+              }}
+            >
+              🚫
+            </div>
+
+            <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e293b", marginBottom: "8px" }}>
+              Course / Class Certificates Not Accepted
+            </h2>
+
+            <p style={{ fontSize: "14px", color: "#475569", lineHeight: "1.5", marginBottom: "18px" }}>
+              We <strong>do not accept</strong> general course completion certificates or private coaching/class certificates (e.g., Udemy, Coursera, private institutes, or class tutorials).
+            </p>
+
+            <div
+              style={{
+                background: "#f0fdf4",
+                border: "1.5px solid #86efac",
+                borderRadius: "12px",
+                padding: "14px 16px",
+                marginBottom: "22px",
+                textAlign: "left",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#15803d", fontWeight: "700", fontSize: "13.5px", marginBottom: "4px" }}>
+                <span>✅</span>
+                <span>Only Official NPTEL Certificates Accepted</span>
+              </div>
+              <p style={{ margin: 0, fontSize: "12.5px", color: "#166534", lineHeight: "1.4" }}>
+                As per the IT Department policy, <strong>ONLY official NPTEL / SWAYAM (IIT / IISc)</strong> course certifications are accepted for achievement records and portfolio credits.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="std-btn-primary"
+              style={{
+                background: "#e11d48",
+                border: "none",
+                padding: "11px 28px",
+                fontSize: "14px",
+                fontWeight: "700",
+                borderRadius: "8px",
+                cursor: "pointer",
+                width: "100%",
+              }}
+              onClick={() => setShowCourseRejectModal(false)}
+            >
+              I Understand (Upload NPTEL Only)
+            </button>
           </div>
         </div>
       )}

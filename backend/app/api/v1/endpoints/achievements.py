@@ -11,17 +11,13 @@ from app.api.deps import get_current_user
 from app.services.duplicate_service import check_duplicate
 from app.services.name_validation_service import validate_participant_name
 from app.services.storage_service import generate_signed_certificate_url
+from app.core.academic import (
+    get_current_academic_year,
+    get_year_level_from_batch,
+    get_batch_from_college_id,
+)
 
 router = APIRouter()
-
-def get_current_academic_year(date_obj: Optional[datetime] = None) -> str:
-    """Returns academic year string like '2024-2025' or '2025-2026'."""
-    now = date_obj or datetime.utcnow()
-    # In Indian engineering colleges, academic year starts in June/July
-    if now.month >= 6:
-        return f"{now.year}-{now.year + 1}"
-    else:
-        return f"{now.year - 1}-{now.year}"
 
 @router.post("/", response_model=AchievementResponse)
 def create_achievement(
@@ -65,8 +61,8 @@ def create_achievement(
 
     # 3. Snapshot student batch, year level & academic year at submission
     acad_year = achievement_in.academic_year or get_current_academic_year()
-    yr_level = achievement_in.year_level or current_user.current_year_level or "TE"
-    batch = achievement_in.admission_batch or current_user.admission_batch or "2023-2027"
+    batch = achievement_in.admission_batch or current_user.admission_batch or get_batch_from_college_id(current_user.college_id)
+    yr_level = achievement_in.year_level or current_user.current_year_level or get_year_level_from_batch(batch, acad_year)
 
     achievement = Achievement(
         user_id=current_user.id,
@@ -169,11 +165,11 @@ def get_all_achievements(
             "level": ach.level,
             "event_date": ach.event_date,
             "certificate_id": ach.certificate_id,
-            "academic_year": ach.academic_year or "2024-2025",
-            "year_level": ach.year_level or (ach.owner.current_year_level if ach.owner else "3rd Year"),
-            "year": ach.year_level or "3rd Year",
-            "admission_batch": ach.admission_batch or (ach.owner.admission_batch if ach.owner else "2023-2027"),
-            "batch": ach.admission_batch or (ach.owner.admission_batch if ach.owner else "2023-2027"),
+            "academic_year": ach.academic_year or get_current_academic_year(),
+            "year_level": ach.year_level or (ach.owner.current_year_level if ach.owner else get_year_level_from_batch(ach.admission_batch or (ach.owner.admission_batch if ach.owner else "2023-2027"))),
+            "year": ach.year_level or (ach.owner.current_year_level if ach.owner else get_year_level_from_batch(ach.admission_batch or (ach.owner.admission_batch if ach.owner else "2023-2027"))),
+            "admission_batch": ach.admission_batch or (ach.owner.admission_batch if ach.owner else (get_batch_from_college_id(ach.owner.college_id) if ach.owner and ach.owner.college_id else "2023-2027")),
+            "batch": ach.admission_batch or (ach.owner.admission_batch if ach.owner else (get_batch_from_college_id(ach.owner.college_id) if ach.owner and ach.owner.college_id else "2023-2027")),
             "certificate_url": c_url,
             "file_url": c_url,
             "file_name": ach.certificate.file_name if ach.certificate else None,

@@ -12,6 +12,7 @@ from app.models.achievement import Achievement
 from app.schemas.user import UserResponse
 from app.core.security import get_password_hash
 from app.api.deps import get_current_user
+from app.core.academic import get_current_academic_year, get_year_level_from_batch, get_batch_from_college_id
 
 router = APIRouter()
 
@@ -122,36 +123,9 @@ async def upload_users_file(
             norm_row.get("cohort") or ""
         )
         if not batch and college_id:
-            cid_up = college_id.strip().upper()
-            if "DSIT" in cid_up or "DSE" in cid_up or "DS" in cid_up:
-                # Direct Second Year: Admitted 2024 -> joins 2022-2026 graduating batch (BE / Final Year)
-                if cid_up.startswith("2024"):
-                    batch = "2022-2026"
-                    inferred_year = "BE"
-                elif cid_up.startswith("2025"):
-                    batch = "2023-2027"
-                    inferred_year = "TE"
-                elif cid_up.startswith("2023"):
-                    batch = "2021-2025"
-                    inferred_year = "Graduated"
-                else:
-                    batch = "2022-2026"
-                    inferred_year = "BE"
-            elif cid_up.startswith("2022"):
-                batch = "2022-2026"
-                inferred_year = "BE"
-            elif cid_up.startswith("2023"):
-                batch = "2023-2027"
-                inferred_year = "TE"
-            elif cid_up.startswith("2024"):
-                batch = "2024-2028"
-                inferred_year = "SE"
-            elif cid_up.startswith("2021"):
-                batch = "2021-2025"
-                inferred_year = "Graduated"
-            else:
-                batch = "2022-2026"
-                inferred_year = "BE"
+            batch = get_batch_from_college_id(college_id)
+
+        inferred_year = get_year_level_from_batch(batch)
 
         year_level = (
             norm_row.get("currentyear") or
@@ -160,7 +134,7 @@ async def upload_users_file(
             norm_row.get("class") or ""
         )
         if not year_level:
-            year_level = "Faculty" if assigned_role == UserRole.TEACHER else (inferred_year or "TE")
+            year_level = "Faculty" if assigned_role == UserRole.TEACHER else (inferred_year or "BE")
 
         user_status = norm_row.get("status") or "Active"
 

@@ -159,14 +159,16 @@ export default function AdminDashboard() {
   const totalAchievements = achievements.length;
 
   const countByYear = (yr) => {
-    return achievements.filter(
-      (a) =>
-        (a.year_level || a.year || "").toLowerCase() === yr.toLowerCase() ||
-        (yr === "2nd Year" && (a.year_level === "SE" || a.year === "2nd Year")) ||
-        (yr === "3rd Year" && (a.year_level === "TE" || a.year === "3rd Year")) ||
-        (yr === "BE" && (a.year_level === "BE" || a.year === "BE" || a.year === "4th Year")) ||
-        (yr === "Graduated" && (a.year_level === "Graduated" || a.status === "Graduated"))
-    ).length;
+    return achievements.filter((a) => {
+      const y = (a.year_level || a.year || "").toLowerCase();
+      const b = (a.admission_batch || a.batch || "").trim();
+      if (yr === "1st Year") return y === "fe" || y.includes("1st") || b === "2026-2030";
+      if (yr === "2nd Year") return y === "se" || y.includes("2nd") || b === "2025-2029";
+      if (yr === "3rd Year") return y === "te" || y.includes("3rd") || b === "2024-2028";
+      if (yr === "BE") return y === "be" || y.includes("4th") || b === "2023-2027";
+      if (yr === "Graduated") return y.includes("grad") || a.status === "Graduated" || b === "2022-2026";
+      return y === yr.toLowerCase();
+    }).length;
   };
 
   // Filtered Table Records
@@ -181,12 +183,14 @@ export default function AdminDashboard() {
         if (selectedYear && selectedYear !== "All") {
           const y = (item.year_level || item.year || "").toLowerCase();
           const target = selectedYear.toLowerCase();
+          const b = (item.admission_batch || item.batch || "").trim();
           const isMatchYear =
             y === target ||
-            (target.includes("2nd") && (y === "se" || y.includes("2nd"))) ||
-            (target.includes("3rd") && (y === "te" || y.includes("3rd"))) ||
-            (target.includes("be") && (y === "be" || y.includes("be") || y.includes("4th"))) ||
-            (target.includes("graduated") && (y.includes("grad") || item.status === "Graduated"));
+            (target.includes("1st") && (y === "fe" || y.includes("1st") || b === "2026-2030")) ||
+            (target.includes("2nd") && (y === "se" || y.includes("2nd") || b === "2025-2029")) ||
+            (target.includes("3rd") && (y === "te" || y.includes("3rd") || b === "2024-2028")) ||
+            (target.includes("be") && (y === "be" || y.includes("4th") || b === "2023-2027")) ||
+            (target.includes("graduated") && (y.includes("grad") || item.status === "Graduated" || b === "2022-2026"));
           if (!isMatchYear) return false;
         }
 
@@ -699,8 +703,25 @@ export default function AdminDashboard() {
             <div className="hod-years-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
               <div className="hod-year-card">
                 <div className="year-cap-icon">🎓</div>
+                <h3>1st Year (FE)</h3>
+                <p>View 1st Year (2026–2030) achievements</p>
+                <div className="year-count-number">{countByYear("1st Year")}</div>
+                <span className="year-sub">Records</span>
+                <button
+                  className="year-view-btn"
+                  onClick={() => {
+                    setSelectedYear("1st Year");
+                    setActiveModal("studentTable");
+                  }}
+                >
+                  View Records ➔
+                </button>
+              </div>
+
+              <div className="hod-year-card">
+                <div className="year-cap-icon">🎓</div>
                 <h3>2nd Year (SE)</h3>
-                <p>View 2nd Year student achievements</p>
+                <p>View 2nd Year (2025–2029) achievements</p>
                 <div className="year-count-number">{countByYear("2nd Year")}</div>
                 <span className="year-sub">Records</span>
                 <button
@@ -714,14 +735,14 @@ export default function AdminDashboard() {
                 </button>
               </div>
 
-              <div className="hod-year-card active-year">
+              <div className="hod-year-card">
                 <div className="year-cap-icon">🎓</div>
                 <h3>3rd Year (TE)</h3>
-                <p>View 3rd Year student achievements</p>
+                <p>View 3rd Year (2024–2028) achievements</p>
                 <div className="year-count-number">{countByYear("3rd Year")}</div>
                 <span className="year-sub">Records</span>
                 <button
-                  className="year-view-btn primary"
+                  className="year-view-btn"
                   onClick={() => {
                     setSelectedYear("3rd Year");
                     setActiveModal("studentTable");
@@ -731,14 +752,14 @@ export default function AdminDashboard() {
                 </button>
               </div>
 
-              <div className="hod-year-card">
+              <div className="hod-year-card active-year">
                 <div className="year-cap-icon">🎓</div>
                 <h3>BE (Final Year)</h3>
-                <p>View BE student achievements</p>
+                <p>View BE (2023–2027) achievements</p>
                 <div className="year-count-number">{countByYear("BE")}</div>
                 <span className="year-sub">Records</span>
                 <button
-                  className="year-view-btn"
+                  className="year-view-btn primary"
                   onClick={() => {
                     setSelectedYear("BE");
                     setActiveModal("studentTable");
@@ -820,6 +841,7 @@ export default function AdminDashboard() {
                   style={{ fontWeight: "600", color: "#1e3a8a" }}
                 >
                   <option value="All">All Academic Years</option>
+                  <option value="2026-2027">2026-2027 (Current)</option>
                   <option value="2025-2026">2025-2026</option>
                   <option value="2024-2025">2024-2025</option>
                   <option value="2023-2024">2023-2024</option>
