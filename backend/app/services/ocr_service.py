@@ -20,8 +20,8 @@ except Exception as e:
 GEMINI_API_KEY = settings.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY", "")
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-# Active Gemini Flash models (gemini-3.6-flash is primary)
-VISION_MODELS = ["gemini-3.6-flash", "gemini-2.5-flash-latest"]
+# Active Gemini Flash models
+VISION_MODELS = ["gemini-flash-latest", "gemini-3.5-flash", "gemini-3.6-flash"]
 
 
 def optimize_image_for_api(image_path: str, max_dimension: int = 1024, quality: int = 80) -> bytes:
@@ -94,25 +94,27 @@ def extract_text(file_path: str) -> str:
 def intelligent_fallback_classify(raw_text: str) -> dict:
     """
     Intelligent keyword-based rule fallback when Gemini vision is unavailable.
-    Never blindly defaults everything to 'Hackathon'.
+    Never blindly defaults everything to 'Certification' or 'Hackathon'.
     """
     text_lower = (raw_text or "").lower()
 
-    category = "Certification"
-    if any(k in text_lower for k in ["vocal", "sing", "music", "dance", "cultural", "art", "drama", "sport", "athletic", "cricket", "badminton", "symphony", "talent"]):
+    category = "Tech Competition"
+    if any(k in text_lower for k in ["nptel", "swayam", "national programme on technology enhanced learning"]):
+        category = "Certification"
+    elif any(k in text_lower for k in ["vocal", "sing", "music", "dance", "cultural", "art", "drama", "sport", "athletic", "cricket", "badminton", "symphony", "talent"]):
         category = "Sports & Cultural"
     elif any(k in text_lower for k in ["intern", "internship", "stipend", "trainee"]):
         category = "Internship"
     elif any(k in text_lower for k in ["paper", "publication", "ieee", "springer", "journal", "conference", "research"]):
         category = "Publication"
-    elif any(k in text_lower for k in ["hackathon", "hack", "coding competition", "codeathon"]):
+    elif any(k in text_lower for k in ["hackathon", "hack", "coding competition", "codeathon", "hackblitz"]):
         category = "Hackathon"
-    elif any(k in text_lower for k in ["tech", "robotics", "project exhibition", "model competition", "techquest"]):
-        category = "Tech Competition"
-    elif any(k in text_lower for k in ["fdp", "faculty development"]):
-        category = "FDP"
     elif any(k in text_lower for k in ["social", "nss", "volunteer", "blood donation", "rotaract", "ngo"]):
         category = "Social Service"
+    elif any(k in text_lower for k in ["fdp", "faculty development"]):
+        category = "FDP"
+    elif any(k in text_lower for k in ["tech", "robotics", "project exhibition", "model competition", "techquest", "workshop", "symposium", "seminar"]):
+        category = "Tech Competition"
 
     # Extract rank / position
     position = "Participant"
@@ -139,7 +141,7 @@ def intelligent_fallback_classify(raw_text: str) -> dict:
         level = "College"
 
     # Title detection
-    title = "Certificate of Merit"
+    title = "Technical Achievement"
     title_match = re.search(r'["\']([^"\']{6,60})["\']', raw_text)
     if title_match:
         title = title_match.group(1)
@@ -153,7 +155,7 @@ def intelligent_fallback_classify(raw_text: str) -> dict:
         "position": position,
         "level": level,
         "certificate_id": "",
-        "description": f"Verified certificate in category {category}."
+        "description": f"Verified achievement in category {category}."
     }
 
 
@@ -178,7 +180,15 @@ def extract_structured_fields(file_path: str, raw_text: str = "") -> dict:
         "Extract the following information from this certificate into pure JSON:\n"
         "- title: exact event name or achievement title (e.g. 'National AI Hackathon 2025')\n"
         "- participant_name: full name of the student/person awarded\n"
-        "- category: strictly one of ['Hackathon', 'Internship', 'Certification', 'Publication', 'Tech Competition', 'Sports & Cultural', 'Social Service', 'FDP', 'Paper Publication']\n"
+        "- category: strictly one of ['Hackathon', 'Tech Competition', 'Internship', 'Publication', 'Sports & Cultural', 'Social Service', 'Certification', 'FDP']\n"
+        "  CRITICAL RULES FOR CATEGORY:\n"
+        "  * Do NOT classify certificates as 'Certification' simply because the document has the word 'Certificate', 'Certificate of Participation', or 'Certificate of Merit'.\n"
+        "  * Use 'Hackathon' for hackathons, codeathons, and coding sprints.\n"
+        "  * Use 'Tech Competition' for technical fests, workshops, project exhibitions, robotics, paper contests, technical events.\n"
+        "  * Use 'Internship' for internships, trainee letters, and industry training.\n"
+        "  * Use 'Publication' for research papers, IEEE/Springer conferences, journals.\n"
+        "  * Use 'Sports & Cultural' for athletics, arts, dance, music, drama.\n"
+        "  * Use 'Certification' ONLY if the certificate is an official NPTEL or SWAYAM certification.\n"
         "- organization: issuing organization/college/institute/company\n"
         "- event_date: date in YYYY-MM-DD or readable date string\n"
         "- position: position or rank (e.g. '1st Runner-Up', 'Winner', 'Participant')\n"

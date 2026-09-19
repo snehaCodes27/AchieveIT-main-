@@ -29,7 +29,7 @@ const CATEGORIES = [
   },
   {
     id: "certification",
-    title: "Certifications & Online Courses",
+    title: "NPTEL Certifications (SWAYAM)",
     iconType: "certificate-purple",
     bgColor: "#f3e8ff",
     iconColor: "#9333ea",
