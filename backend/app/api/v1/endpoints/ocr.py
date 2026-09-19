@@ -2,15 +2,21 @@ import os
 import shutil
 import uuid
 import logging
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.orm import Session
+
 from app.db.session import get_db
 from app.api.deps import get_current_user
 from app.models.user import User
+
 from app.services.ocr_service import extract_text, extract_structured_fields
 from app.services.duplicate_service import compute_file_hash, check_duplicate
 from app.services.name_validation_service import validate_participant_name
-from app.services.storage_service import upload_certificate_to_supabase, generate_signed_certificate_url
+from app.services.storage_service import (
+    upload_certificate_to_supabase,
+    generate_signed_certificate_url,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,19 +27,27 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".pdf"}
 
+
 @router.post("/scan")
 async def scan_certificate(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
+    # -----------------------------
+    # 1. Validate file
+    # -----------------------------
     file_ext = os.path.splitext(file.filename)[1].lower()
+
     if file_ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file format '{file_ext}'. Allowed formats: JPG, PNG, PDF, WEBP"
+            detail=f"Unsupported file format '{file_ext}'."
         )
 
+    # -----------------------------
+    # 2. Save uploaded file
+    # -----------------------------
     unique_filename = f"{uuid.uuid4().hex}_{file.filename}"
     file_path = os.path.join(UPLOAD_DIR, unique_filename)
 
@@ -41,107 +55,104 @@ async def scan_certificate(
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+        logger.exception("File save failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to save certificate."
+        )
 
-    # 1. Compute SHA-256 Hash INSTANTLY (0.01s)
-    file_hash = compute_file_hash(file_path)
+    try:
+        # -----------------------------
+        # 3. Fast duplicate check
+        # -----------------------------
+        file_hash = compute_file_hash(file_path)
 
-    # 2. Check for exact file duplicate immediately (0.01s)
-    is_dup, reason, dup_info = check_duplicate(
-        db=db,
-        user_id=current_user.id,
-        file_hash=file_hash
-    )
+        is_dup, reason, dup_info = check_duplicate(
+            db,
+            file_hash,
+            current_user.id
+        )
 
-    # 3. If exact duplicate, remove temp file and return immediately without calling AI
-    if is_dup:
+        if is_dup:
+            return {
+                "success": False,
+                "duplicate": True,
+                "message": reason,
+                "duplicate_info": dup_info,
+            }
+
+        # -----------------------------
+        # 4. OCR
+        # -----------------------------
+        text = extract_text(file_path)
+
+        if not text or not text.strip():
+            raise HTTPException(
+                status_code=422,
+                detail="Could not extract text from the certificate."
+            )
+
+        # -----------------------------
+        # 5. AI structured extraction
+        # -----------------------------
+        structured_data = extract_structured_fields(
+            text,
+            current_user=current_user
+        )
+
+        # -----------------------------
+        # 6. Name validation
+        # -----------------------------
+        participant_name = structured_data.get("participant_name")
+
+        name_validation = None
+
+        if participant_name:
+            name_validation = validate_participant_name(
+                participant_name,
+                current_user.full_name
+            )
+
+        # -----------------------------
+        # 7. Upload to Supabase
+        # -----------------------------
+        storage_path = upload_certificate_to_supabase(
+            file_path,
+            current_user.id,
+            unique_filename
+        )
+
+        signed_url = generate_signed_certificate_url(
+            storage_path
+        )
+
+        return {
+            "success": True,
+            "duplicate": False,
+            "text": text,
+            "data": structured_data,
+            "name_validation": name_validation,
+            "certificate_url": signed_url,
+            "storage_path": storage_path,
+            "file_hash": file_hash,
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.exception("Certificate scanning failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Certificate processing failed."
+        )
+
+    finally:
+        # -----------------------------
+        # 8. Remove temporary file
+        # -----------------------------
         try:
             if os.path.exists(file_path):
                 os.remove(file_path)
         except Exception:
-            pass
-
-        return {
-            "file_url": dup_info.get("file_url") or f"/uploads/{unique_filename}",
-            "preview_url": dup_info.get("file_url") or "",
-            "file_name": file.filename,
-            "file_hash": file_hash,
-            "extracted_text": "",
-            "is_duplicate": True,
-            "duplicate_reason": reason,
-            "duplicate_info": dup_info,
-            "name_validation": {
-                "is_match": True,
-                "is_team": False,
-                "extracted_name": current_user.name,
-                "user_name": current_user.name,
-                "message": "Duplicate file check flagged."
-            },
-            "is_name_mismatch": False,
-            "data": {
-                "title": dup_info.get("title", "Duplicate Certificate"),
-                "event_name": dup_info.get("event_name", ""),
-                "category": "Hackathon",
-                "participant_name": current_user.name,
-                "organization": "Department of Information Technology",
-                "organizer": "",
-                "event_date": dup_info.get("date", ""),
-                "position": "Duplicate",
-                "level": "College",
-                "certificate_id": ""
-            }
-        }
-
-    # 4. Fast Single-Pass AI OCR & Field Extraction (Under 1.5s)
-    raw_text = extract_text(file_path)
-    extracted_data = extract_structured_fields(file_path, raw_text)
-    
-    extracted_participant = extracted_data.get("participant_name") or ""
-    
-    # 5. Validate Certificate Owner / Participant Name
-    name_val = validate_participant_name(
-        extracted_name=extracted_participant,
-        user_name=current_user.name,
-        raw_ocr_text=raw_text
-    )
-
-    if not extracted_data.get("participant_name"):
-        extracted_data["participant_name"] = current_user.name
-
-    # 6. Upload certificate to Supabase Storage (Private bucket: 'certificates')
-    storage_ref = None
-    signed_preview_url = None
-    try:
-        storage_ref = upload_certificate_to_supabase(
-            user_id=current_user.id,
-            file_source=file_path,
-            filename=unique_filename,
-            content_type=file.content_type
-        )
-        signed_preview_url = generate_signed_certificate_url(storage_ref)
-    except Exception as e:
-        logger.error(f"Failed to upload certificate to Supabase Storage: {str(e)}")
-        # Fallback to local storage reference if Supabase is offline or fails
-        storage_ref = f"/uploads/{unique_filename}"
-        signed_preview_url = f"http://localhost:8000{storage_ref}"
-
-    # 7. Clean up temporary local file if successfully stored in Supabase
-    if storage_ref and storage_ref.startswith("certificates/"):
-        try:
-            if os.path.exists(file_path):
-                os.remove(file_path)
-        except Exception as e:
-            logger.warning(f"Failed to clean up temporary file {file_path}: {str(e)}")
-
-    return {
-        "file_url": storage_ref,
-        "preview_url": signed_preview_url or storage_ref,
-        "file_name": file.filename,
-        "file_hash": file_hash,
-        "extracted_text": raw_text or str(extracted_data),
-        "is_duplicate": False,
-        "name_validation": name_val,
-        "is_name_mismatch": not name_val["is_match"],
-        "mismatch_warning": name_val.get("message") if not name_val["is_match"] else None,
-        "data": extracted_data,
-    }
+            logger.warning("Could not remove temporary file")
