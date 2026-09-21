@@ -77,7 +77,7 @@ export default function StudentDashboard() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [activeProfileTab, setActiveProfileTab] = useState("avatar");
   const [profileImage, setProfileImage] = useState(
- 	localStorage.getItem(`student_avatar_${user?.college_id || user?.collegeId || "default"}`) || ""	
+    localStorage.getItem(`student_avatar_${user?.college_id || user?.collegeId || "default"}`) || ""
   );
   const [previewAvatar, setPreviewAvatar] = useState("");
   const [profileSuccess, setProfileSuccess] = useState("");
@@ -402,12 +402,12 @@ export default function StudentDashboard() {
           scanResult.extracted_text || ""
         ].join(" ").toLowerCase();
 
-        const isNptel = 
-          fullOcrText.includes("nptel") || 
-          fullOcrText.includes("swayam") || 
+        const isNptel =
+          fullOcrText.includes("nptel") ||
+          fullOcrText.includes("swayam") ||
           fullOcrText.includes("national programme on technology enhanced learning");
 
-        const isCourseOrClass = 
+        const isCourseOrClass =
           detectedCat === "certification" ||
           fullOcrText.includes("course") ||
           fullOcrText.includes("class") ||
@@ -425,40 +425,25 @@ export default function StudentDashboard() {
           setIsCourseRejected(true);
           setShowCourseRejectModal(true);
           setFormError("🚫 Course/Class certificates are not accepted. Only official NPTEL/SWAYAM certificates are allowed.");
-          // Clear form so rejected course data is not autofilled
-          setFormData((prev) => ({
-            ...prev,
-            title: "",
-            certificateId: "",
-            issuer: "",
-            date: "",
-            category: "hackathon",
-            position: "Participant",
-            level: "College",
-            description: "",
-            fileUrl: "",
-            fileHash: "",
-            extractedText: "",
-            participantName: "",
-          }));
         } else {
           setIsCourseRejected(false);
-          setFormData((prev) => ({
-            ...prev,
-            title: d.title || prev.title,
-            certificateId: d.certificate_id || d.certificateId || d.credentialId || prev.certificateId,
-            issuer: d.organization || d.organizer || d.issuer || prev.issuer,
-            date: d.event_date || d.date || prev.date,
-            category: detectedCat,
-            position: d.position || prev.position || "Participant",
-            level: d.level || prev.level || "College",
-            description: d.description || d.title || prev.description,
-            fileUrl: scanResult.file_url || "",
-            fileHash: scanResult.file_hash || "",
-            extractedText: scanResult.extracted_text || "",
-            participantName: d.participant_name || "",
-          }));
         }
+
+        setFormData((prev) => ({
+          ...prev,
+          title: d.title || prev.title,
+          certificateId: d.certificate_id || d.certificateId || d.credentialId || prev.certificateId,
+          issuer: d.organization || d.organizer || d.issuer || prev.issuer,
+          date: d.event_date || d.date || prev.date,
+          category: detectedCat,
+          position: d.position || prev.position || "Participant",
+          level: d.level || prev.level || "College",
+          description: d.description || d.title || prev.description,
+          fileUrl: scanResult.file_url || "",
+          fileHash: scanResult.file_hash || "",
+          extractedText: scanResult.extracted_text || "",
+          participantName: d.participant_name || "",
+        }));
       }
     } catch (err) {
       console.warn("OCR scanning error:", err);
@@ -466,35 +451,6 @@ export default function StudentDashboard() {
     } finally {
       setIsScanning(false);
     }
-  };
-
-  // Close course rejection modal and reset form/file state
-  const handleCloseCourseRejectModal = () => {
-    setShowCourseRejectModal(false);
-    setIsCourseRejected(false);
-    setSelectedRawFile(null);
-    setFileSizeKB(0);
-    setCompressionStats(null);
-    setIsOverLimit(false);
-    setFormError("");
-    setScanMessage("");
-    setFormData((prev) => ({
-      ...prev,
-      title: "",
-      certificateId: "",
-      issuer: "",
-      date: "",
-      category: "hackathon",
-      position: "Participant",
-      level: "College",
-      description: "",
-      file: null,
-      fileName: "",
-      fileUrl: "",
-      fileHash: "",
-      extractedText: "",
-      participantName: "",
-    }));
   };
 
   // Form Submission
@@ -519,9 +475,9 @@ export default function StudentDashboard() {
       formData.description || ""
     ].join(" ").toLowerCase();
 
-    const isNptel = 
-      fullFormText.includes("nptel") || 
-      fullFormText.includes("swayam") || 
+    const isNptel =
+      fullFormText.includes("nptel") ||
+      fullFormText.includes("swayam") ||
       fullFormText.includes("national programme on technology enhanced learning");
 
     const isCourseOrClass =
@@ -618,9 +574,9 @@ export default function StudentDashboard() {
     }
   };
 
-const studentName = user?.name || user?.fullName || "";
-const studentId = user?.college_id || user?.collegeId || user?.studentId || "";
-const firstName = studentName.split(" ")[0] || "Student";
+  const studentName = user?.name || user?.fullName || "";
+  const studentId = user?.college_id || user?.collegeId || user?.studentId || "";
+  const firstName = studentName.split(" ")[0] || "Student";
   const initials = studentName
     .split(" ")
     .map((n) => n[0])
@@ -1630,10 +1586,10 @@ const firstName = studentName.split(" ")[0] || "Student";
                   {isSubmitting
                     ? "Submitting..."
                     : isNameMismatch
-                    ? "Name Mismatch Blocked"
-                    : isCourseRejected
-                    ? "🚫 Blocked (Only NPTEL Accepted)"
-                    : "Confirm & Save Achievement →"}
+                      ? "Name Mismatch Blocked"
+                      : isCourseRejected
+                        ? "🚫 Blocked (Only NPTEL Accepted)"
+                        : "Confirm & Save Achievement →"}
                 </button>
               </div>
             </form>
@@ -1729,9 +1685,8 @@ const firstName = studentName.split(" ")[0] || "Student";
                           <td>{item.event_date || item.date || item.issueDate || (item.created_at ? new Date(item.created_at).toISOString().split('T')[0] : "—")}</td>
                           <td>
                             <span
-                              className={`status-pill ${
-                                (item.status || "verified").toLowerCase()
-                              }`}
+                              className={`status-pill ${(item.status || "verified").toLowerCase()
+                                }`}
                             >
                               {item.status || "Verified"}
                             </span>
@@ -1837,7 +1792,7 @@ const firstName = studentName.split(" ")[0] || "Student";
         <div
           className="std-modal-overlay"
           style={{ zIndex: 1300, background: "rgba(15, 23, 42, 0.75)" }}
-          onClick={handleCloseCourseRejectModal}
+          onClick={() => setShowCourseRejectModal(false)}
         >
           <div
             className="std-modal-content"
@@ -1907,7 +1862,33 @@ const firstName = studentName.split(" ")[0] || "Student";
                 cursor: "pointer",
                 width: "100%",
               }}
-              onClick={handleCloseCourseRejectModal}
+              onClick={() => {
+                setShowCourseRejectModal(false);
+                setIsCourseRejected(false);
+                setFormError("");
+                setScanMessage("");
+                setSelectedRawFile(null);
+                setFileSizeKB(0);
+                setIsOverLimit(false);
+                setCompressionStats(null);
+                setFormData({
+                  title: "",
+                  certificateId: "",
+                  category: "hackathon",
+                  issuer: "",
+                  date: new Date().toISOString().split("T")[0],
+                  position: "Participant",
+                  level: "College",
+                  description: "",
+                  file: null,
+                  fileName: "",
+                  fileUrl: "",
+                  fileHash: "",
+                  extractedText: "",
+                  participantName: "",
+                });
+              }}
+
             >
               I Understand (Upload NPTEL Only)
             </button>
