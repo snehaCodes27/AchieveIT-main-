@@ -68,9 +68,9 @@ async def scan_certificate(
         file_hash = compute_file_hash(file_path)
 
         is_dup, reason, dup_info = check_duplicate(
-            db,
-            file_hash,
-            current_user.id
+            db=db,
+            user_id=current_user.id,
+            file_hash=file_hash,
         )
 
         if is_dup:
@@ -111,9 +111,11 @@ async def scan_certificate(
         name_validation = None
 
         if participant_name:
+            user_name = getattr(current_user, "name", "") or getattr(current_user, "full_name", "")
             name_validation = validate_participant_name(
-                participant_name,
-                current_user.full_name
+                extracted_name=participant_name,
+                user_name=user_name,
+                raw_ocr_text=text or ""
             )
 
         # -----------------------------
@@ -150,7 +152,7 @@ async def scan_certificate(
         logger.exception("Certificate scanning failed")
         raise HTTPException(
             status_code=500,
-            detail="Certificate processing failed."
+            detail=f"Certificate processing failed: {str(e)}"
         )
 
     finally:
