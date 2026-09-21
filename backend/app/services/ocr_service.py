@@ -30,6 +30,7 @@ VISION_MODELS = [
 ]
 
 
+
 def optimize_image_for_api(image_path: str, max_dimension: int = 1600, quality: int = 85) -> bytes:
     """Resize and compress an image for Gemini Vision API."""
     try:
@@ -254,6 +255,7 @@ def extract_structured_fields(file_path: str, raw_text: str = "") -> dict:
 
         except Exception as e:
             print(f"[Gemini Vision Optimization/Call Error] {e}")
+
 
     # ── Path B: PDF / Vision fallback → Gemini text-only ─────────────────
     # Use native PDF text if available, else whatever RapidOCR gave us.
