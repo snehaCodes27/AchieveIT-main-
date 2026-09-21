@@ -77,19 +77,19 @@ async def scan_certificate(
             return {
                 "success": False,
                 "duplicate": True,
+                "is_duplicate": True,
                 "message": reason,
                 "duplicate_info": dup_info,
             }
 
-               # -----------------------------
+        # -----------------------------
         # 4. OCR (quick text for logging / preview)
         # -----------------------------
         text = extract_text(file_path)
 
-        # Note: empty text from RapidOCR is acceptable for images —
+        # Empty text from RapidOCR is acceptable for images —
         # Gemini Vision does not need it. Only block if PDF gives nothing.
-        file_ext_check = os.path.splitext(file.filename)[1].lower()
-        if file_ext_check == ".pdf" and (not text or not text.strip()):
+        if file_ext == ".pdf" and (not text or not text.strip()):
             raise HTTPException(
                 status_code=422,
                 detail="Could not extract text from the PDF certificate."
@@ -102,7 +102,6 @@ async def scan_certificate(
             file_path,
             raw_text=text or ""
         )
-
 
         # -----------------------------
         # 6. Name validation
@@ -133,10 +132,11 @@ async def scan_certificate(
         return {
             "success": True,
             "duplicate": False,
-            "text": text,
+            "is_duplicate": False,
+            "extracted_text": text,        # was "text" — frontend reads "extracted_text"
             "data": structured_data,
             "name_validation": name_validation,
-            "certificate_url": signed_url,
+            "file_url": signed_url,        # was "certificate_url" — frontend reads "file_url"
             "storage_path": storage_path,
             "file_hash": file_hash,
         }
