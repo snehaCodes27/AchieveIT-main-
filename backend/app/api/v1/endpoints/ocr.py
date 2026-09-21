@@ -81,24 +81,28 @@ async def scan_certificate(
                 "duplicate_info": dup_info,
             }
 
-        # -----------------------------
-        # 4. OCR
+               # -----------------------------
+        # 4. OCR (quick text for logging / preview)
         # -----------------------------
         text = extract_text(file_path)
 
-        if not text or not text.strip():
+        # Note: empty text from RapidOCR is acceptable for images —
+        # Gemini Vision does not need it. Only block if PDF gives nothing.
+        file_ext_check = os.path.splitext(file.filename)[1].lower()
+        if file_ext_check == ".pdf" and (not text or not text.strip()):
             raise HTTPException(
                 status_code=422,
-                detail="Could not extract text from the certificate."
+                detail="Could not extract text from the PDF certificate."
             )
 
         # -----------------------------
-        # 5. AI structured extraction
+        # 5. AI structured extraction (Gemini Vision primary)
         # -----------------------------
         structured_data = extract_structured_fields(
-            text,
-            current_user=current_user
+            file_path,
+            raw_text=text or ""
         )
+
 
         # -----------------------------
         # 6. Name validation
