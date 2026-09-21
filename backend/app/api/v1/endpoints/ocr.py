@@ -119,15 +119,17 @@ async def scan_certificate(
         # -----------------------------
         # 7. Upload to Supabase
         # -----------------------------
-        storage_path = upload_certificate_to_supabase(
-            file_path,
-            current_user.id,
-            unique_filename
-        )
-
-        signed_url = generate_signed_certificate_url(
-            storage_path
-        )
+        storage_path = None
+        signed_url = None
+        try:
+            storage_path = upload_certificate_to_supabase(
+                user_id=current_user.id,
+                file_source=file_path,
+                filename=unique_filename
+            )
+            signed_url = generate_signed_certificate_url(storage_path)
+        except Exception as upload_err:
+            logger.warning(f"Supabase upload notice: {upload_err}")
 
         return {
             "success": True,

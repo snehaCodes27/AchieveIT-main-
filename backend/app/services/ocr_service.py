@@ -23,7 +23,11 @@ except Exception as e:
 GEMINI_API_KEY = settings.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY", "")
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-VISION_MODEL = "gemini-3.6-flash"
+VISION_MODELS = [
+    "gemini-3.1-flash-lite",
+    "gemini-flash-latest",
+    "gemini-3.6-flash",
+]
 
 
 def optimize_image_for_api(image_path: str, max_dimension: int = 1600, quality: int = 85) -> bytes:
@@ -224,29 +228,32 @@ def extract_structured_fields(file_path: str, raw_text: str = "") -> dict:
     if file_ext in (".jpg", ".jpeg", ".png", ".webp"):
         try:
             image_data = optimize_image_for_api(file_path)
+            for model_name in VISION_MODELS:
+                try:
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=[
+                            types.Part.from_bytes(data=image_data, mime_type="image/jpeg"),
+                            _EXTRACTION_PROMPT,
+                        ],
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            temperature=0.1,
+                            max_output_tokens=800,
+                        ),
+                    )
 
-            response = client.models.generate_content(
-                model=VISION_MODEL,
-                contents=[
-                    types.Part.from_bytes(data=image_data, mime_type="image/jpeg"),
-                    _EXTRACTION_PROMPT,
-                ],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    temperature=0.1,
-                    max_output_tokens=800,
-                ),
-            )
-
-            if response and response.text:
-                data = json.loads(response.text)
-                if isinstance(data, dict) and data.get("participant_name"):
-                    print("[OCR] Gemini Vision extraction succeeded.")
-                    return data
-                print("[OCR] Gemini Vision returned incomplete data — trying text fallback.")
+                    if response and response.text:
+                        data = json.loads(response.text)
+                        if isinstance(data, dict) and data.get("participant_name"):
+                            print(f"[OCR] Gemini Vision extraction succeeded with model {model_name}.")
+                            return data
+                except Exception as model_err:
+                    print(f"[Gemini Vision Error with {model_name}] {model_err}")
+                    continue
 
         except Exception as e:
-            print(f"[Gemini Vision Error] {e}")
+            print(f"[Gemini Vision Optimization/Call Error] {e}")
 
     # ── Path B: PDF / Vision fallback → Gemini text-only ─────────────────
     # Use native PDF text if available, else whatever RapidOCR gave us.
@@ -259,25 +266,27 @@ def extract_structured_fields(file_path: str, raw_text: str = "") -> dict:
         text_for_gemini = extract_text_rapidocr(file_path) if file_ext in (".jpg", ".jpeg", ".png", ".webp") else ""
 
     if len(text_for_gemini) >= 30:
-        try:
-            response = client.models.generate_content(
-                model=VISION_MODEL,
-                contents=_EXTRACTION_PROMPT + "\n\nCertificate text:\n" + text_for_gemini[:10000],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    temperature=0.1,
-                    max_output_tokens=800,
-                ),
-            )
+        for model_name in VISION_MODELS:
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=_EXTRACTION_PROMPT + "\n\nCertificate text:\n" + text_for_gemini[:10000],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.1,
+                        max_output_tokens=800,
+                    ),
+                )
 
-            if response and response.text:
-                data = json.loads(response.text)
-                if isinstance(data, dict):
-                    print("[OCR] Gemini text-only extraction succeeded.")
-                    return data
+                if response and response.text:
+                    data = json.loads(response.text)
+                    if isinstance(data, dict):
+                        print(f"[OCR] Gemini text-only extraction succeeded with model {model_name}.")
+                        return data
 
-        except Exception as e:
-            print(f"[Gemini Text Error] {e}")
+            except Exception as e:
+                print(f"[Gemini Text Error with {model_name}] {e}")
+                continue
 
     print("[OCR] All Gemini paths failed — using rule-based fallback.")
     return fallback_response
