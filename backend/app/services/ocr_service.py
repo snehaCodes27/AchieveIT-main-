@@ -23,7 +23,7 @@ except Exception as e:
 GEMINI_API_KEY = settings.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY", "")
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-VISION_MODEL = "gemini-2.0-flash"
+VISION_MODEL = "gemini-3.6-flash"
 
 
 def optimize_image_for_api(image_path: str, max_dimension: int = 1600, quality: int = 85) -> bytes:
