@@ -425,25 +425,40 @@ export default function StudentDashboard() {
           setIsCourseRejected(true);
           setShowCourseRejectModal(true);
           setFormError("🚫 Course/Class certificates are not accepted. Only official NPTEL/SWAYAM certificates are allowed.");
+          // Clear form so rejected course data is not autofilled
+          setFormData((prev) => ({
+            ...prev,
+            title: "",
+            certificateId: "",
+            issuer: "",
+            date: "",
+            category: "hackathon",
+            position: "Participant",
+            level: "College",
+            description: "",
+            fileUrl: "",
+            fileHash: "",
+            extractedText: "",
+            participantName: "",
+          }));
         } else {
           setIsCourseRejected(false);
+          setFormData((prev) => ({
+            ...prev,
+            title: d.title || prev.title,
+            certificateId: d.certificate_id || d.certificateId || d.credentialId || prev.certificateId,
+            issuer: d.organization || d.organizer || d.issuer || prev.issuer,
+            date: d.event_date || d.date || prev.date,
+            category: detectedCat,
+            position: d.position || prev.position || "Participant",
+            level: d.level || prev.level || "College",
+            description: d.description || d.title || prev.description,
+            fileUrl: scanResult.file_url || "",
+            fileHash: scanResult.file_hash || "",
+            extractedText: scanResult.extracted_text || "",
+            participantName: d.participant_name || "",
+          }));
         }
-
-        setFormData((prev) => ({
-          ...prev,
-          title: d.title || prev.title,
-          certificateId: d.certificate_id || d.certificateId || d.credentialId || prev.certificateId,
-          issuer: d.organization || d.organizer || d.issuer || prev.issuer,
-          date: d.event_date || d.date || prev.date,
-          category: detectedCat,
-          position: d.position || prev.position || "Participant",
-          level: d.level || prev.level || "College",
-          description: d.description || d.title || prev.description,
-          fileUrl: scanResult.file_url || "",
-          fileHash: scanResult.file_hash || "",
-          extractedText: scanResult.extracted_text || "",
-          participantName: d.participant_name || "",
-        }));
       }
     } catch (err) {
       console.warn("OCR scanning error:", err);
@@ -451,6 +466,35 @@ export default function StudentDashboard() {
     } finally {
       setIsScanning(false);
     }
+  };
+
+  // Close course rejection modal and reset form/file state
+  const handleCloseCourseRejectModal = () => {
+    setShowCourseRejectModal(false);
+    setIsCourseRejected(false);
+    setSelectedRawFile(null);
+    setFileSizeKB(0);
+    setCompressionStats(null);
+    setIsOverLimit(false);
+    setFormError("");
+    setScanMessage("");
+    setFormData((prev) => ({
+      ...prev,
+      title: "",
+      certificateId: "",
+      issuer: "",
+      date: "",
+      category: "hackathon",
+      position: "Participant",
+      level: "College",
+      description: "",
+      file: null,
+      fileName: "",
+      fileUrl: "",
+      fileHash: "",
+      extractedText: "",
+      participantName: "",
+    }));
   };
 
   // Form Submission
@@ -1793,7 +1837,7 @@ const firstName = studentName.split(" ")[0] || "Student";
         <div
           className="std-modal-overlay"
           style={{ zIndex: 1300, background: "rgba(15, 23, 42, 0.75)" }}
-          onClick={() => setShowCourseRejectModal(false)}
+          onClick={handleCloseCourseRejectModal}
         >
           <div
             className="std-modal-content"
@@ -1863,7 +1907,7 @@ const firstName = studentName.split(" ")[0] || "Student";
                 cursor: "pointer",
                 width: "100%",
               }}
-              onClick={() => setShowCourseRejectModal(false)}
+              onClick={handleCloseCourseRejectModal}
             >
               I Understand (Upload NPTEL Only)
             </button>
