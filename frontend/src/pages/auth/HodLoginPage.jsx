@@ -7,7 +7,13 @@ export default function HodLoginPage({ onBackHome }) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isWakingServer, setIsWakingServer] = useState(false);
   const { login } = useAuth();
+
+  React.useEffect(() => {
+    // ⚡ Pre-warm backend and database connection pool as soon as HOD login page opens
+    fetch('https://achieveit-backend-4ffa.onrender.com/api/health', { mode: 'cors' }).catch(() => {});
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,8 +24,14 @@ export default function HodLoginPage({ onBackHome }) {
       return;
     }
 
+    let wakeTimer;
     try {
       setLoading(true);
+      setIsWakingServer(false);
+      wakeTimer = setTimeout(() => {
+        setIsWakingServer(true);
+      }, 2500);
+
       const loggedUser = await login(adminId, password);
       if (loggedUser.role !== 'admin') {
         setError('This account does not have HOD Admin privileges.');
@@ -27,7 +39,9 @@ export default function HodLoginPage({ onBackHome }) {
     } catch (err) {
       setError(err.message || 'Invalid HOD credentials. Please verify and try again.');
     } finally {
+      if (wakeTimer) clearTimeout(wakeTimer);
       setLoading(false);
+      setIsWakingServer(false);
     }
   };
 
@@ -188,7 +202,9 @@ export default function HodLoginPage({ onBackHome }) {
 
               {/* Submit Button */}
               <button type="submit" className="ref-submit-btn" disabled={loading}>
-                {loading ? 'Signing In...' : 'Sign In to Admin Portal →'}
+                {loading
+                  ? (isWakingServer ? '⚡ Waking up server, please wait...' : 'Signing In...')
+                  : 'Sign In to Admin Portal →'}
               </button>
             </form>
 

@@ -23,11 +23,35 @@ app.add_middleware(
 os.makedirs("uploads", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-# Health check endpoint
+# Warm up database connection pool on startup
+@app.on_event("startup")
+def startup_warmup():
+    try:
+        from app.db.session import SessionLocal
+        from sqlalchemy import text
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        print("[Startup] Database connection pool initialized and warmed up.")
+    except Exception as e:
+        print(f"[Startup Warning] DB warm-up failed: {e}")
+
+# Health check endpoint (used for pre-warming and keep-alive pings)
 @app.get("/api/health", tags=["Health"])
 def health_check():
+    db_status = "ok"
+    try:
+        from app.db.session import SessionLocal
+        from sqlalchemy import text
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+    except Exception as e:
+        db_status = f"error: {e}"
+
     return {
         "status": "healthy",
+        "database": db_status,
         "app": settings.PROJECT_NAME,
         "version": "1.0.0"
     }

@@ -9,7 +9,13 @@ export default function LoginPage({ onNavigate, setCurrentPage }) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isWakingServer, setIsWakingServer] = useState(false);
   const [error, setError] = useState('');
+
+  React.useEffect(() => {
+    // ⚡ Pre-warm backend and database connection pool as soon as login page opens
+    fetch('https://achieveit-backend-4ffa.onrender.com/api/health', { mode: 'cors' }).catch(() => {});
+  }, []);
 
   const handleBackHome = () => {
     if (typeof onNavigate === 'function') {
@@ -37,8 +43,14 @@ export default function LoginPage({ onNavigate, setCurrentPage }) {
       return;
     }
 
+    let wakeTimer;
     try {
       setLoading(true);
+      setIsWakingServer(false);
+      wakeTimer = setTimeout(() => {
+        setIsWakingServer(true);
+      }, 2500);
+
       await login(trimmedId, password, role);
 
       const targetPage = role === 'teacher' ? 'teacher' : 'student';
@@ -52,7 +64,9 @@ export default function LoginPage({ onNavigate, setCurrentPage }) {
       const serverMsg = err.response?.data?.detail || err.response?.data?.message || err.message;
       setError(serverMsg || 'Invalid ID or Password. Please try again.');
     } finally {
+      if (wakeTimer) clearTimeout(wakeTimer);
       setLoading(false);
+      setIsWakingServer(false);
     }
   };
 
@@ -192,7 +206,9 @@ export default function LoginPage({ onNavigate, setCurrentPage }) {
                 disabled={loading}
                 className="ref-submit-btn"
               >
-                {loading ? 'Authenticating...' : `Sign In as ${role === 'student' ? 'Student' : 'Faculty'} →`}
+                {loading
+                  ? (isWakingServer ? '⚡ Waking up server, please wait...' : 'Authenticating...')
+                  : `Sign In as ${role === 'student' ? 'Student' : 'Faculty'} →`}
               </button>
             </form>
 

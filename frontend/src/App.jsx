@@ -16,6 +16,9 @@ function AppContent() {
   const [portalMode, setPortalMode] = useState('user'); // 'user' or 'admin'
 
   useEffect(() => {
+    // ⚡ Pre-warm Render backend & DB pool in the background immediately
+    fetch('https://achieveit-backend-4ffa.onrender.com/api/health', { mode: 'cors' }).catch(() => {});
+
     const timer = setTimeout(() => {
       setShowSplash(false);
     }, 2200);
